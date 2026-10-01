@@ -1,6 +1,6 @@
 /* Financial Strategy 2026 PRO — service worker
    Змінюйте VERSION при кожному оновленні index.html, щоб користувачі отримали нову версію. */
-const VERSION="fin26-v1";
+const VERSION="fin26-v2";
 const CORE=["./","./index.html","./manifest.json","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png"];
 const CDN=["https://cdn.jsdelivr.net/npm/chart.js"];
 const RUNTIME_HOSTS=["cdn.jsdelivr.net","cdnjs.cloudflare.com","tessdata.projectnaptha.com","unpkg.com"];
