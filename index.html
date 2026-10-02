@@ -382,6 +382,18 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
     <span class="instrTag">Налаштування</span>
    </div></div>
 
+   <div class="instrStep"><div class="instrNum">23</div><div class="instrBody">
+    <div class="instrTitle"><span class="instrIcon">🔁</span> Перекази між рахунками</div>
+    <div class="instrText">У розділі «Рахунки» натисніть «🔁 Переказ»: виберіть рахунок-відправник і отримувач, суму та дату. Гроші переходять з одного рахунку на інший, а загальний баланс, доходи й витрати не змінюються. Переказ видно в «Історії» (фільтр типу «Переказ») і можна видалити, якщо створено помилково.</div>
+    <span class="instrTag">Рахунки</span>
+   </div></div>
+
+   <div class="instrStep"><div class="instrNum">24</div><div class="instrBody">
+    <div class="instrTitle"><span class="instrIcon">💱</span> Конвертер валют</div>
+    <div class="instrText">Розділ «💱 Курси»: введіть суму, виберіть валюти, і одразу побачите результат та курс. Нижче таблиця: та сама сума в кількох валютах одразу (список можна змінювати). Джерело курсів: світові (ExchangeRate-API) або офіційні НБУ. Курси оновлюються раз на добу; останні завантажені зберігаються й показуються без інтернету.</div>
+    <span class="instrTag">Курси</span>
+   </div></div>
+
    <div class="instrStep"><div class="instrNum">20</div><div class="instrBody">
     <div class="instrTitle"><span class="instrIcon">📲</span> Встановлення як застосунок і робота офлайн</div>
     <div class="instrText">Якщо програма розміщена за https-адресою, у «Налаштування → 📲 Застосунок та офлайн-режим» натисніть «Встановити застосунок» (на iPhone: Safari → «Поділитись» → «На початковий екран»). Після першого відкриття з інтернетом програма працює й без нього: усі операції, цілі й фото зберігаються на пристрої. Без інтернету не працюють лише хмарна синхронізація JSONBin та перше розпізнавання чека (мовний модуль потрібно один раз завантажити онлайн). Нові версії програма пропонує встановити сама.</div>
@@ -412,6 +424,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
    <button onclick="go('accounts')">Рахунки</button>
    <button onclick="go('goals')">Цілі</button>
    <button onclick="go('planner')">🛒 План</button>
+   <button onclick="go('converter')">💱 Курси</button>
    <button onclick="go('debts')">Борги</button>
    <button onclick="go('budget')">Бюджет</button>
    <button onclick="go('settings')">Налаштування</button>
@@ -539,7 +552,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
    </div>
    <div class="grid grid4">
     <div class="field" style="margin:0"><label>Тип</label>
-     <select id="histFilterType" onchange="renderHistory()"><option value="">Усі</option><option value="income">Дохід</option><option value="expense">Витрата</option></select>
+     <select id="histFilterType" onchange="renderHistory()"><option value="">Усі</option><option value="income">Дохід</option><option value="expense">Витрата</option><option value="transfer">Переказ</option></select>
     </div>
     <div class="field" style="margin:0"><label>Категорія</label>
      <select id="histFilterCategory" onchange="renderHistory()"><option value="">Усі категорії</option></select>
@@ -693,7 +706,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
  </div>
  <div id="accounts-body" class="sectionBody collapsed">
   <div class="card">
-   <div class="head"><div></div><button class="btn primary" onclick="addAccount()">+ Рахунок</button></div>
+   <div class="head"><div></div><div class="row"><button class="btn cyan" onclick="transferModal()">🔁 Переказ</button><button class="btn primary" onclick="addAccount()">+ Рахунок</button></div></div>
    <div id="accountsList"></div>
   </div>
  </div>
@@ -727,6 +740,42 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
   <div class="card">
    <div class="head"><div class="muted small">Оцінка спирається на ваш середній вільний залишок (доходи мінус витрати) у поточному періоді. «Відкладено» тут — це облік, а не списання з рахунків.</div><button class="btn primary" onclick="addPlan()">+ Покупка</button></div>
    <div id="plansList"></div>
+  </div>
+ </div>
+</section>
+
+<!-- CONVERTER -->
+<section id="converter">
+ <div class="card sectionToggle" onclick="toggleSection('converter')">
+  <div class="head" style="margin-bottom:0">
+   <div><h2 style="margin:0">💱 Конвертер валют</h2><div class="muted small">Актуальні курси: будь-яка сума в різних валютах</div></div>
+   <span class="badge arrowBadge" id="converter-arrow">▶</span>
+  </div>
+ </div>
+ <div id="converter-body" class="sectionBody collapsed">
+  <div class="card">
+   <div class="grid grid2">
+    <div class="field"><label>Сума</label><input id="convAmount" type="text" inputmode="decimal" placeholder="100" oninput="renderConverter()"></div>
+    <div class="field"><label>Джерело курсів</label>
+     <select id="convSource" onchange="setRateSource(this.value)"><option value="auto">Світові курси (ExchangeRate-API)</option><option value="nbu">Офіційні курси НБУ</option></select>
+    </div>
+   </div>
+   <div class="row" style="align-items:flex-end;flex-wrap:nowrap">
+    <div style="flex:1;min-width:0"><label>З валюти</label><select id="convFrom" onchange="renderConverter()"></select></div>
+    <button class="btn" onclick="swapCur()" style="margin-bottom:12px" title="Поміняти місцями">⇄</button>
+    <div style="flex:1;min-width:0"><label>У валюту</label><select id="convTo" onchange="renderConverter()"></select></div>
+   </div>
+   <div class="kpi" style="margin-top:6px"><div class="label">РЕЗУЛЬТАТ</div><div class="value cyan" id="convResult" style="font-size:22px">—</div><div id="convRates" class="small muted" style="margin-top:8px"></div></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+   <h3>У кількох валютах одразу</h3>
+   <div id="convTable"></div>
+   <div class="field" style="margin-top:10px"><select id="convAdd" onchange="addFavCur(this.value)"></select></div>
+  </div>
+  <div class="card" style="margin-top:14px">
+   <div class="row"><button class="btn cyan" onclick="refreshRates(true)">🔄 Оновити курси</button></div>
+   <div id="convStatus" class="small muted" style="margin-top:8px"></div>
+   <div class="small muted" style="margin-top:8px">Це ринкові (середні) або офіційні курси. Банки та обмінники застосовують власні курси купівлі й продажу, тому реальна сума може відрізнятися. Курси оновлюються раз на добу.</div>
   </div>
  </div>
 </section>
@@ -916,7 +965,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
 /* =========================================================
    STATE
 ========================================================= */
-const APP_VERSION="2026.10.02-1";
+const APP_VERSION="2026.10.02-2";
 const KEY="fin26_state_v13";
 const KEY_PERIOD="fin26_period_v1";      // окрема резервна копія періоду
 const KEY_MIG="fin26_migrated_v1";       // прапорець: старі ключі вже перенесені
@@ -948,6 +997,11 @@ const DEFAULT={
   hideAmounts:false,
   autoLock:0,
   pinHash:"",
+  convFrom:"USD",
+  convTo:"UAH",
+  convAmount:"100",
+  favCur:["UAH","USD","EUR","PLN","GBP","CZK"],
+  rateSource:"auto",
   binId:"",
   binKey:"",
   autoSync:false,
@@ -1139,6 +1193,7 @@ function toggleSection(id){
   body.classList.remove("collapsed");
   if(arrow){arrow.textContent="▼";arrow.classList.add("open");}
   if(id==="budget")setTimeout(()=>{updateCharts();updateCompare();},60);
+  if(id==="converter"){renderConverter();ensureRates();}
  }else{
   body.classList.add("collapsed");
   if(arrow){arrow.textContent="▶";arrow.classList.remove("open");}
@@ -1357,7 +1412,7 @@ function toggleAccount(id){
 }
 function deleteAccount(id){
  if(S.accounts.length<=1){alert("Не можна видалити останній рахунок");return;}
- if(S.transactions.some(t=>t.accountId===id)){alert("Цей рахунок використовується в операціях і не може бути видалений.");return;}
+ if(S.transactions.some(t=>t.accountId===id||t.fromAccountId===id||t.toAccountId===id)){alert("Цей рахунок використовується в операціях і не може бути видалений.");return;}
  if(!confirm("Видалити цей рахунок?"))return;
  S.accounts=S.accounts.filter(a=>a.id!==id);
  markDirty();refresh();
@@ -1529,16 +1584,16 @@ function renderHistory(){
  const fromF=document.getElementById("histFilterFrom")?.value||"";
  const toF=document.getElementById("histFilterTo")?.value||"";
 
- let arr=S.transactions.filter(t=>t.type==="income"||t.type==="expense");
+ let arr=S.transactions.filter(t=>t.type==="income"||t.type==="expense"||t.type==="transfer");
  if(typeF)arr=arr.filter(t=>t.type===typeF);
  if(catF)arr=arr.filter(t=>(t.category||"Інше")===catF);
- if(accF)arr=arr.filter(t=>t.accountId===accF);
+ if(accF)arr=arr.filter(t=>t.accountId===accF||t.fromAccountId===accF||t.toAccountId===accF);
  if(fromF)arr=arr.filter(t=>t.date>=fromF);
  if(toF)arr=arr.filter(t=>t.date<=toF);
 
  let totalSum=0;
  if(typeF)totalSum=arr.reduce((s,t)=>s+amt(t),0);
- else totalSum=arr.reduce((s,t)=>s+(t.type==="income"?amt(t):-amt(t)),0);
+ else totalSum=arr.reduce((s,t)=>s+(t.type==="transfer"?0:(t.type==="income"?amt(t):-amt(t))),0);
 
  const labelEl=document.getElementById("histFilteredLabel");
  const totalEl=document.getElementById("histFilteredTotal");
@@ -1546,6 +1601,7 @@ function renderHistory(){
   totalEl.textContent=money(totalSum);
   if(typeF==="expense"){labelEl.textContent="СУМА ВИТРАТ";totalEl.className="value red";}
   else if(typeF==="income"){labelEl.textContent="СУМА ДОХОДІВ";totalEl.className="value green";}
+  else if(typeF==="transfer"){labelEl.textContent="СУМА ПЕРЕКАЗІВ";totalEl.className="value cyan";}
   else{labelEl.textContent="РАЗОМ (БАЛАНС)";totalEl.className="value "+(totalSum>=0?"green":"red");}
  }
 
@@ -1555,6 +1611,10 @@ function renderHistory(){
  el.innerHTML=arr.map(t=>{
   const amount=amt(t);
   const income=t.type==="income";
+  if(t.type==="transfer"){
+   const f=account(t.fromAccountId),to=account(t.toAccountId);
+   return `<div class="item"><div class="row" style="justify-content:space-between"><div><div class="itemTitle">🔁 Переказ</div><div class="small muted">${fd(t.date)} • ${esc(f?.name||"?")} → ${esc(to?.name||"?")}</div>${t.memo?`<div class="small muted" style="margin-top:5px">${esc(t.memo)}</div>`:""}</div><div style="text-align:right"><b class="cyan">${money(amount)}</b><div class="row" style="justify-content:flex-end;margin-top:7px"><button class="btn red smallBtn" onclick="deleteTx('${t.id}')">🗑</button></div></div></div></div>`;
+  }
   const acc=account(t.accountId);
   return `
    <div class="item">
@@ -2786,6 +2846,185 @@ function renderPlans(){
 }
 
 /* =========================================================
+   ПЕРЕКАЗИ МІЖ РАХУНКАМИ
+========================================================= */
+function transferModal(){
+ const act=S.accounts.filter(a=>a.active);
+ if(act.length<2){alert("Для переказу потрібно щонайменше два активні рахунки. Додайте ще один рахунок.");return;}
+ const opts=idx=>act.map((a,i)=>`<option value="${a.id}"${i===idx?" selected":""}>${esc(a.name)} (${money(accountBalance(a.id))})</option>`).join("");
+ document.getElementById("modal").style.display="flex";
+ document.getElementById("modalContent").innerHTML=`
+  <h2>🔁 Переказ між рахунками</h2>
+  <div class="field"><label>З рахунку</label><select id="trFrom">${opts(0)}</select></div>
+  <div class="field"><label>На рахунок</label><select id="trTo">${opts(1)}</select></div>
+  <div class="field"><label>Сума</label><input id="trAmount" type="number" step="0.01" min="0"></div>
+  <div class="field"><label>Дата</label><input id="trDate" type="date" value="${today()}"></div>
+  <div class="field"><label>Коментар</label><input id="trMemo" placeholder="Наприклад: зняв готівку"></div>
+  <div class="row">
+   <button class="btn green" onclick="saveTransfer()">💾 Виконати переказ</button>
+   <button class="btn" onclick="closeModal()">Скасувати</button>
+  </div>`;
+}
+function saveTransfer(){
+ const from=document.getElementById("trFrom").value,to=document.getElementById("trTo").value;
+ const amount=Number(document.getElementById("trAmount").value);
+ const date=document.getElementById("trDate").value||today();
+ if(from===to){alert("Виберіть різні рахунки");return;}
+ if(!amount||amount<=0){alert("Введіть правильну суму");return;}
+ if(amount>accountBalance(from)+0.001&&!confirm("Сума більша за баланс рахунку-відправника. Баланс стане від'ємним. Продовжити?"))return;
+ S.transactions.push({id:uid(),type:"transfer",amount,amt:amount,date,category:"Переказ",fromAccountId:from,toAccountId:to,memo:document.getElementById("trMemo").value.trim(),group:"transfer"});
+ markDirty();closeModal();refresh();
+ alert("Переказ виконано");
+}
+
+/* =========================================================
+   КОНВЕРТЕР ВАЛЮТ (актуальні курси)
+========================================================= */
+const RATES_KEY="fin26_rates_v1";
+const POPULAR=["UAH","USD","EUR","PLN","GBP","CZK","CHF","CAD","TRY","CNY","JPY"];
+let RATES=null,convFilled=false;
+let curDN=null;
+try{curDN=new Intl.DisplayNames(["uk"],{type:"currency"});}catch(e){}
+function curName(c){try{return(curDN&&curDN.of(c))||c;}catch(e){return c;}}
+
+function loadRatesCache(){
+ try{const r=JSON.parse(localStorage.getItem(RATES_KEY)||"null");if(r&&r.rates)RATES=r;}catch(e){}
+}
+async function fetchErApi(){
+ const r=await fetch("https://open.er-api.com/v6/latest/USD",{cache:"no-store"});
+ if(!r.ok)throw new Error("http");
+ const j=await r.json();
+ if(j.result!=="success"||!j.rates)throw new Error("bad");
+ return{source:"er",rates:j.rates,provDate:j.time_last_update_utc||"",fetched:Date.now()};
+}
+async function fetchNbu(){
+ const r=await fetch("https://bank.gov.ua/NBUStatService/v1/statdirectory/exchange?json",{cache:"no-store"});
+ if(!r.ok)throw new Error("http");
+ const arr=await r.json();
+ const per={UAH:1};
+ arr.forEach(x=>{if(x.cc&&x.rate>0)per[x.cc]=x.rate;});
+ const usd=per.USD;
+ if(!usd)throw new Error("bad");
+ const rates={};
+ Object.entries(per).forEach(([cc,u])=>{rates[cc]=usd/u;});
+ return{source:"nbu",rates,provDate:(arr[0]&&arr[0].exchangedate)||"",fetched:Date.now()};
+}
+async function refreshRates(manual){
+ const st=document.getElementById("convStatus");
+ if(!navigator.onLine){
+  if(manual&&st)st.textContent="Немає інтернету. Показано останні збережені курси.";
+  renderConverter();return;
+ }
+ if(manual&&st)st.textContent="⏳ Оновлення курсів…";
+ try{
+  const pref=S.settings.rateSource||"auto";
+  let r;
+  if(pref==="nbu")r=await fetchNbu();
+  else{try{r=await fetchErApi();}catch(e){r=await fetchNbu();}}
+  RATES=r;
+  try{localStorage.setItem(RATES_KEY,JSON.stringify(r));}catch(e){}
+  convFilled=false;
+  renderConverter();
+ }catch(e){
+  if(st)st.textContent="Не вдалося отримати курси. Перевірте інтернет і спробуйте ще раз."+(RATES?" Показано останні збережені.":"");
+ }
+}
+function ensureRates(){
+ if(!RATES||Date.now()-(RATES.fetched||0)>6*3600*1000)refreshRates(false);
+}
+function setRateSource(v){
+ S.settings.rateSource=v;persist();
+ refreshRates(true);
+}
+
+function convert(amount,from,to){
+ if(!RATES)return null;
+ const r=RATES.rates;
+ if(!r[from]||!r[to])return null;
+ return amount/r[from]*r[to];
+}
+function fmtNum(v){
+ const a=Math.abs(v);
+ const d=a>=1?2:a>=0.01?4:6;
+ return v.toLocaleString("uk-UA",{minimumFractionDigits:d===2?2:0,maximumFractionDigits:d});
+}
+function curLabel(c){return `${c} — ${curName(c)}`;}
+
+function fillCurrencySelects(){
+ const g=id=>document.getElementById(id);
+ if(!RATES)return;
+ const all=Object.keys(RATES.rates).sort();
+ const pop=POPULAR.filter(c=>RATES.rates[c]);
+ const rest=all.filter(c=>!pop.includes(c));
+ const opts=(sel)=>`<optgroup label="Популярні">${pop.map(c=>`<option value="${c}"${c===sel?" selected":""}>${esc(curLabel(c))}</option>`).join("")}</optgroup><optgroup label="Усі валюти">${rest.map(c=>`<option value="${c}"${c===sel?" selected":""}>${esc(curLabel(c))}</option>`).join("")}</optgroup>`;
+ g("convFrom").innerHTML=opts(S.settings.convFrom);
+ g("convTo").innerHTML=opts(S.settings.convTo);
+ g("convFrom").value=RATES.rates[S.settings.convFrom]?S.settings.convFrom:"USD";
+ g("convTo").value=RATES.rates[S.settings.convTo]?S.settings.convTo:"UAH";
+ convFilled=true;
+}
+
+function swapCur(){
+ const f=document.getElementById("convFrom"),t=document.getElementById("convTo");
+ const x=f.value;f.value=t.value;t.value=x;
+ renderConverter();
+}
+function addFavCur(c){
+ if(!c)return;
+ if(!S.settings.favCur.includes(c))S.settings.favCur.push(c);
+ persist();renderConverter();
+}
+function removeFavCur(c){
+ S.settings.favCur=S.settings.favCur.filter(x=>x!==c);
+ persist();renderConverter();
+}
+
+function renderConverter(){
+ const g=id=>document.getElementById(id);
+ if(!g("convResult"))return;
+ const srcSel=g("convSource");
+ if(srcSel)srcSel.value=S.settings.rateSource||"auto";
+ const amountEl=g("convAmount");
+ if(amountEl&&!amountEl.dataset.init){amountEl.value=S.settings.convAmount||"100";amountEl.dataset.init="1";}
+ if(!RATES){
+  g("convResult").textContent="—";
+  g("convRates").textContent="";
+  g("convTable").innerHTML='<div class="empty">Немає збережених курсів. Підключіться до інтернету й натисніть «Оновити курси».</div>';
+  g("convStatus").textContent=navigator.onLine?"⏳ Завантаження курсів…":"Немає інтернету й немає збережених курсів.";
+  return;
+ }
+ if(!convFilled)fillCurrencySelects();
+ const from=g("convFrom").value,to=g("convTo").value;
+ const raw=(amountEl.value||"").replace(/\s/g,"").replace(",",".");
+ const amount=parseFloat(raw);
+ S.settings.convFrom=from;S.settings.convTo=to;S.settings.convAmount=amountEl.value;persist();
+
+ if(!isFinite(amount)){
+  g("convResult").textContent="Введіть суму";
+  g("convRates").textContent="";
+ }else{
+  const v=convert(amount,from,to);
+  g("convResult").textContent=v===null?"Курс недоступний":`${fmtNum(amount)} ${from} = ${fmtNum(v)} ${to}`;
+  const one=convert(1,from,to),back=convert(1,to,from);
+  g("convRates").textContent=one===null?"":`1 ${from} = ${fmtNum(one)} ${to}  •  1 ${to} = ${fmtNum(back)} ${from}`;
+ }
+
+ const favs=S.settings.favCur.filter(c=>c!==from&&RATES.rates[c]);
+ g("convTable").innerHTML=favs.length?favs.map(c=>{
+  const v=isFinite(amount)?convert(amount,from,c):null;
+  return `<div class="statLine"><span>${esc(curLabel(c))}</span><span><b>${v===null?"—":fmtNum(v)+" "+c}</b> <button class="btn red smallBtn" onclick="removeFavCur('${c}')">✕</button></span></div>`;
+ }).join(""):'<div class="empty">Додайте валюти нижче</div>';
+ const addable=Object.keys(RATES.rates).sort().filter(c=>!S.settings.favCur.includes(c)&&c!==from);
+ g("convAdd").innerHTML='<option value="">➕ Додати валюту до списку…</option>'+addable.map(c=>`<option value="${c}">${esc(curLabel(c))}</option>`).join("");
+
+ const when=RATES.source==="nbu"
+  ?`офіційні курси НБУ станом на ${RATES.provDate||"—"}`
+  :`світові курси від ${RATES.provDate?new Date(RATES.provDate).toLocaleString("uk-UA"):"—"}`;
+ g("convStatus").innerHTML=`Курси: ${when}. Оновлено в застосунку: ${new Date(RATES.fetched).toLocaleString("uk-UA")}${navigator.onLine?"":" (немає інтернету, показано збережені)"}.`+
+  (RATES.source==="er"?` <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener" style="color:var(--c)">Rates By Exchange Rate API</a>`:"");
+}
+
+/* =========================================================
    ОНОВЛЕННЯ ПРОГРАМИ
 ========================================================= */
 let lastUpdCheck=0,foundVersion="";
@@ -3326,6 +3565,7 @@ window.addEventListener("DOMContentLoaded",()=>{
  setupPWA();
  initCalendarSwipe();
  scheduleUpdateChecks();
+ loadRatesCache();
  const e=document.getElementById("expenseDate"),i=document.getElementById("incomeDate");
  if(e&&!e.value)e.value=today();
  if(i&&!i.value)i.value=today();
