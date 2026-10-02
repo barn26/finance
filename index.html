@@ -207,6 +207,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
    <input id="loginPassword" type="password" placeholder="Введіть пароль" onkeydown="if(event.key==='Enter')login()">
   </div>
   <button class="btn primary" style="width:100%" onclick="login()">🔐 Увійти</button>
+  <button id="bioLoginBtn" class="btn green" style="width:100%;margin-top:10px;display:none" onclick="bioLogin(false)">👆 Увійти за відбитком</button>
   <button class="btn cyan" style="width:100%;margin-top:10px" onclick="openInstructions()">📖 Інструкція</button>
   <button id="installLoginBtn" class="btn green" style="width:100%;margin-top:10px;display:none" onclick="installApp()">📲 Встановити застосунок</button>
   <div id="iosHint" class="small muted" style="display:none;margin-top:10px;text-align:center">iPhone/iPad: натисніть «Поділитися» → «На початковий екран»</div>
@@ -398,6 +399,12 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
     <div class="instrTitle"><span class="instrIcon">🌍</span> Перегляд сум в іншій валюті</div>
     <div class="instrText">Вибір валюти у верхньому меню (поруч із кнопкою 👁) перераховує всі суми в програмі: баланс, історію, календар, бюджет, цілі, борги, плани, графіки. Усі дані при цьому зберігаються й вносяться в базовій валюті (вона вказується в «Налаштування → Вигляд і валюта»). Для перерахунку використовується поточний курс, тому старі операції теж показуються за сьогоднішнім курсом, це орієнтовні суми. Щоб повернутись, виберіть базову валюту зі списку або натисніть кнопку в повідомленні вгорі.</div>
     <span class="instrTag">Верхнє меню</span>
+   </div></div>
+
+   <div class="instrStep"><div class="instrNum">26</div><div class="instrBody">
+    <div class="instrTitle"><span class="instrIcon">👆</span> Вхід за відбитком пальця</div>
+    <div class="instrText">«Налаштування → 🔒 Безпека → Увімкнути вхід за відбитком»: телефон попросить підтвердити відбиток (на iPhone — Face ID/Touch ID). Після цього на екрані входу з'явиться кнопка «👆 Увійти за відбитком», а під час запуску програма сама запропонує підтвердити. Пароль і PIN залишаються запасним способом. Функція працює лише на пристрої, де її увімкнено, потребує https і біометрії, налаштованої в телефоні, а також додає зручності, але не шифрує дані.</div>
+    <span class="instrTag">Налаштування → Безпека</span>
    </div></div>
 
    <div class="instrStep"><div class="instrNum">20</div><div class="instrBody">
@@ -899,6 +906,11 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
      <button class="btn red" onclick="removePin()">Видалити PIN</button>
     </div>
     <div id="pinStatus" class="small muted" style="margin-bottom:12px"></div>
+    <div class="row" style="margin-bottom:6px">
+     <button class="btn cyan" id="bioEnableBtn" style="display:none" onclick="bioEnable()">👆 Увімкнути вхід за відбитком</button>
+     <button class="btn red" id="bioDisableBtn" style="display:none" onclick="bioDisable()">Вимкнути вхід за відбитком</button>
+    </div>
+    <div id="bioStatus" class="small muted" style="margin-bottom:12px"></div>
     <div class="field"><label>Автоблокування після бездіяльності</label>
      <select id="autoLockSel" onchange="setAutoLock(this.value)"><option value="0">Вимкнено</option><option value="1">1 хв</option><option value="2">2 хв</option><option value="5">5 хв</option><option value="10">10 хв</option><option value="15">15 хв</option></select>
     </div>
@@ -974,7 +986,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
 /* =========================================================
    STATE
 ========================================================= */
-const APP_VERSION="2026.10.02-3";
+const APP_VERSION="2026.10.02-4";
 const KEY="fin26_state_v13";
 const KEY_PERIOD="fin26_period_v1";      // окрема резервна копія періоду
 const KEY_MIG="fin26_migrated_v1";       // прапорець: старі ключі вже перенесені
@@ -1171,6 +1183,15 @@ async function hashPin(p){
  return "d"+(h>>>0);
 }
 
+function enterApp(){
+ document.getElementById("login").style.display="none";
+ document.getElementById("appContent").style.display="block";
+ refresh(true);
+ initAI();
+ resetIdle();
+ if(location.hash){const hid=location.hash.slice(1);if(document.getElementById(hid))setTimeout(()=>go(hid),250);}
+}
+
 async function login(){
  if(Date.now()<lockUntil){
   alert(`Забагато невдалих спроб. Зачекайте ${Math.ceil((lockUntil-Date.now())/1000)} с.`);
@@ -1183,12 +1204,7 @@ async function login(){
  }
  if(ok){
   loginFails=0;
-  document.getElementById("login").style.display="none";
-  document.getElementById("appContent").style.display="block";
-  refresh(true);
-  initAI();
-  resetIdle();
-  if(location.hash){const hid=location.hash.slice(1);if(document.getElementById(hid))setTimeout(()=>go(hid),250);}
+  enterApp();
  }else{
   loginFails++;
   if(loginFails>=5){
@@ -2877,6 +2893,83 @@ function renderPlans(){
 }
 
 /* =========================================================
+   ВХІД ЗА ВІДБИТКОМ (WebAuthn, біометрія пристрою)
+========================================================= */
+const BIO_KEY="fin26_bio_v1";
+let bioSupported=null;
+const b64e=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+const b64d=x=>{x=x.replace(/-/g,"+").replace(/_/g,"/");while(x.length%4)x+="=";return Uint8Array.from(atob(x),c=>c.charCodeAt(0));};
+const randBytes=n=>crypto.getRandomValues(new Uint8Array(n));
+
+async function bioCheck(){
+ if(bioSupported!==null)return bioSupported;
+ try{
+  bioSupported=!!(window.isSecureContext&&window.PublicKeyCredential&&PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable&&await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+ }catch(e){bioSupported=false;}
+ return bioSupported;
+}
+function bioEnabled(){try{return !!localStorage.getItem(BIO_KEY);}catch(e){return false;}}
+
+async function bioUpdateUI(){
+ const sup=await bioCheck(),on=bioEnabled();
+ const g=id=>document.getElementById(id);
+ if(g("bioEnableBtn"))g("bioEnableBtn").style.display=sup&&!on?"":"none";
+ if(g("bioDisableBtn"))g("bioDisableBtn").style.display=on?"":"none";
+ if(g("bioLoginBtn"))g("bioLoginBtn").style.display=sup&&on?"":"none";
+ if(g("bioStatus")){
+  g("bioStatus").textContent=!sup
+   ?"Вхід за відбитком недоступний: потрібні https і біометрія, налаштована в телефоні."
+   :on?"✅ Вхід за відбитком увімкнено на цьому пристрої.":"Вхід за відбитком вимкнено.";
+ }
+}
+
+async function bioEnable(){
+ if(!(await bioCheck())){alert("Вхід за відбитком недоступний на цьому пристрої або в цьому режимі (потрібен https).");return;}
+ try{
+  const cred=await navigator.credentials.create({publicKey:{
+   challenge:randBytes(32),
+   rp:{name:"Financial Strategy"},
+   user:{id:randBytes(16),name:"user",displayName:"Користувач"},
+   pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],
+   authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},
+   timeout:60000,attestation:"none"
+  }});
+  localStorage.setItem(BIO_KEY,b64e(cred.rawId));
+  bioUpdateUI();
+  alert("Вхід за відбитком увімкнено.");
+ }catch(e){
+  if(e&&e.name!=="NotAllowedError"&&e.name!=="AbortError")alert("Не вдалося увімкнути вхід за відбитком.");
+ }
+}
+function bioDisable(){
+ if(!confirm("Вимкнути вхід за відбитком на цьому пристрої?"))return;
+ try{localStorage.removeItem(BIO_KEY);}catch(e){}
+ bioUpdateUI();
+}
+
+async function bioLogin(auto){
+ const id=localStorage.getItem(BIO_KEY);
+ if(!id)return;
+ try{
+  await navigator.credentials.get({publicKey:{
+   challenge:randBytes(32),
+   allowCredentials:[{type:"public-key",id:b64d(id)}],
+   userVerification:"required",
+   timeout:60000
+  }});
+  loginFails=0;
+  enterApp();
+ }catch(e){
+  if(!auto)alert("Відбиток не підтверджено. Скористайтесь PIN або паролем.");
+ }
+}
+
+async function bioInit(){
+ await bioUpdateUI();
+ if(bioSupported&&bioEnabled()&&!appVisible())setTimeout(()=>{if(!appVisible())bioLogin(true);},500);
+}
+
+/* =========================================================
    ПЕРЕГЛЯД СУМ В ІНШІЙ ВАЛЮТІ
 ========================================================= */
 function fillViewSelect(){
@@ -3619,6 +3712,7 @@ function refresh(syncForm){
  updateCompare();
  fillViewSelect();
  updateViewBanner();
+ bioUpdateUI();
  loadExtraSettings();
  if(syncForm)loadSettingsToForm();
 }
@@ -3633,6 +3727,7 @@ window.addEventListener("DOMContentLoaded",()=>{
  initCalendarSwipe();
  scheduleUpdateChecks();
  loadRatesCache();
+ bioInit();
  if(S.settings.viewCur)ensureRates();
  const e=document.getElementById("expenseDate"),i=document.getElementById("incomeDate");
  if(e&&!e.value)e.value=today();
