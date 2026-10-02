@@ -394,6 +394,12 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
     <span class="instrTag">Курси</span>
    </div></div>
 
+   <div class="instrStep"><div class="instrNum">25</div><div class="instrBody">
+    <div class="instrTitle"><span class="instrIcon">🌍</span> Перегляд сум в іншій валюті</div>
+    <div class="instrText">Вибір валюти у верхньому меню (поруч із кнопкою 👁) перераховує всі суми в програмі: баланс, історію, календар, бюджет, цілі, борги, плани, графіки. Усі дані при цьому зберігаються й вносяться в базовій валюті (вона вказується в «Налаштування → Вигляд і валюта»). Для перерахунку використовується поточний курс, тому старі операції теж показуються за сьогоднішнім курсом, це орієнтовні суми. Щоб повернутись, виберіть базову валюту зі списку або натисніть кнопку в повідомленні вгорі.</div>
+    <span class="instrTag">Верхнє меню</span>
+   </div></div>
+
    <div class="instrStep"><div class="instrNum">20</div><div class="instrBody">
     <div class="instrTitle"><span class="instrIcon">📲</span> Встановлення як застосунок і робота офлайн</div>
     <div class="instrText">Якщо програма розміщена за https-адресою, у «Налаштування → 📲 Застосунок та офлайн-режим» натисніть «Встановити застосунок» (на iPhone: Safari → «Поділитись» → «На початковий екран»). Після першого відкриття з інтернетом програма працює й без нього: усі операції, цілі й фото зберігаються на пристрої. Без інтернету не працюють лише хмарна синхронізація JSONBin та перше розпізнавання чека (мовний модуль потрібно один раз завантажити онлайн). Нові версії програма пропонує встановити сама.</div>
@@ -428,6 +434,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
    <button onclick="go('debts')">Борги</button>
    <button onclick="go('budget')">Бюджет</button>
    <button onclick="go('settings')">Налаштування</button>
+   <select id="viewCurSel" onchange="setViewCur(this.value)" title="Показувати суми у валюті" style="width:auto;padding:7px 8px;font-size:12px;align-self:center"></select>
    <button id="hideBtn" onclick="toggleHide()" title="Сховати/показати суми">👁</button>
    <button onclick="toggleTheme()" title="Світла/темна тема">🌗</button>
    <button onclick="logout()">Вийти</button>
@@ -436,6 +443,8 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
 </header>
 
 <main class="container">
+
+<div id="viewBanner" class="item" style="display:none;border-color:rgba(70,224,255,.4);background:rgba(70,224,255,.07)"></div>
 
 <!-- HOME -->
 <section id="home">
@@ -876,10 +885,10 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
     <div class="field"><label>Тема</label>
      <select id="themeSel" onchange="setTheme(this.value)"><option value="dark">Темна</option><option value="light">Світла</option><option value="auto">Авто (як у системі)</option></select>
     </div>
-    <div class="field"><label>Символ валюти</label>
+    <div class="field"><label>Базова валюта (в ній вносяться суми)</label>
      <select id="currencySel" onchange="setCurrency(this.value)"><option value="₴">₴ (гривня)</option><option value="$">$ (долар)</option><option value="€">€ (євро)</option><option value="zł">zł (злотий)</option><option value="£">£ (фунт)</option></select>
     </div>
-    <div class="small muted">Валюта змінює лише символ, суми автоматично не конвертуються.</div>
+    <div class="small muted">Це валюта, у якій ви вносите й зберігаєте суми (змінює лише символ, без перерахунку). Переглядати всі суми в іншій валюті можна вибором валюти у верхньому меню.</div>
    </div>
    <div class="card">
     <h2>🔒 Безпека</h2>
@@ -965,7 +974,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
 /* =========================================================
    STATE
 ========================================================= */
-const APP_VERSION="2026.10.02-2";
+const APP_VERSION="2026.10.02-3";
 const KEY="fin26_state_v13";
 const KEY_PERIOD="fin26_period_v1";      // окрема резервна копія періоду
 const KEY_MIG="fin26_migrated_v1";       // прапорець: старі ключі вже перенесені
@@ -1002,6 +1011,7 @@ const DEFAULT={
   convAmount:"100",
   favCur:["UAH","USD","EUR","PLN","GBP","CZK"],
   rateSource:"auto",
+  viewCur:"",
   binId:"",
   binKey:"",
   autoSync:false,
@@ -1020,10 +1030,29 @@ let autoTimer=null;
 ========================================================= */
 function clone(x){return JSON.parse(JSON.stringify(x));}
 function uid(){return Date.now().toString(36)+"_"+Math.random().toString(36).slice(2,9);}
+const CUR_SYM={UAH:"₴",USD:"$",EUR:"€",PLN:"zł",GBP:"£"};
+const SYM_CODE={"₴":"UAH","$":"USD","€":"EUR","zł":"PLN","£":"GBP"};
 function cur(){return (S&&S.settings&&S.settings.currency)||"₴";}
+function baseCode(){return SYM_CODE[cur()]||"UAH";}
+// Чи активний перегляд у іншій валюті (потрібні завантажені курси)
+function viewActive(){
+ const v=S&&S.settings&&S.settings.viewCur;
+ if(!v||v===baseCode()||typeof RATES==="undefined"||!RATES)return false;
+ const r=RATES.rates;
+ return !!(r[baseCode()]&&r[v]);
+}
+function viewFactor(){
+ if(!viewActive())return 1;
+ const r=RATES.rates;
+ return r[S.settings.viewCur]/r[baseCode()];
+}
+function viewSymbol(){
+ return viewActive()?(CUR_SYM[S.settings.viewCur]||S.settings.viewCur):cur();
+}
 function money(n){
- if(S&&S.settings&&S.settings.hideAmounts)return "•••• "+cur();
- return Number(n||0).toLocaleString("uk-UA",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+cur();
+ const sym=viewSymbol();
+ if(S&&S.settings&&S.settings.hideAmounts)return "•••• "+sym;
+ return (Number(n||0)*viewFactor()).toLocaleString("uk-UA",{minimumFractionDigits:2,maximumFractionDigits:2})+" "+sym;
 }
 function fmtDate(d){
  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -2134,6 +2163,7 @@ function updateCharts(){
  const trendCanvas=document.getElementById("trendChart");
  const catCanvas=document.getElementById("categoryChart");
  if(!trendCanvas||!catCanvas)return;
+ const vf=viewFactor();
 
  const labels=[],incomes=[],expenses=[],balances=[];
  let d=dateObj(start);
@@ -2148,7 +2178,7 @@ function updateCharts(){
     if(t.type==="expense")exp+=amt(t);
    }
   });
-  incomes.push(inc);expenses.push(exp);balances.push(totalBalanceUntil(ds));
+  incomes.push(inc*vf);expenses.push(exp*vf);balances.push(totalBalanceUntil(ds)*vf);
   d.setDate(d.getDate()+1);
  }
 
@@ -2165,7 +2195,7 @@ function updateCharts(){
  });
 
  const a=analytics();
- const catLabels=a.list.map(x=>x[0]),catData=a.list.map(x=>x[1]);
+ const catLabels=a.list.map(x=>x[0]),catData=a.list.map(x=>x[1]*vf);
  if(categoryChart)categoryChart.destroy();
  categoryChart=new Chart(catCanvas,{
   type:"doughnut",
@@ -2509,7 +2539,7 @@ function toggleTheme(){
  const eff=document.documentElement.dataset.theme==="light"?"dark":"light";
  setTheme(eff);
 }
-function setCurrency(v){S.settings.currency=v;markDirty();refresh();}
+function setCurrency(v){S.settings.currency=v;if(S.settings.viewCur===baseCode())S.settings.viewCur="";markDirty();refresh();}
 function setHide(on){S.settings.hideAmounts=!!on;persist();refresh();}
 function toggleHide(){setHide(!S.settings.hideAmounts);}
 
@@ -2699,11 +2729,12 @@ function updateCompare(){
  if(!canvas||typeof Chart==="undefined")return;
  const st=S.settings.periodStart,dur=c.dur;
  const labels=[],inc=[],exp=[];
+ const vf=viewFactor();
  for(let i=5;i>=0;i--){
   const ps=addDays(st,-dur*i),pe=addDays(ps,dur-1);
   const r=rangeStats(ps,pe);
   labels.push(fd(ps).slice(0,5)+"–"+fd(pe).slice(0,5));
-  inc.push(r.income);exp.push(r.expense);
+  inc.push(r.income*vf);exp.push(r.expense*vf);
  }
  if(periodsChart)periodsChart.destroy();
  periodsChart=new Chart(canvas,{
@@ -2846,6 +2877,38 @@ function renderPlans(){
 }
 
 /* =========================================================
+   ПЕРЕГЛЯД СУМ В ІНШІЙ ВАЛЮТІ
+========================================================= */
+function fillViewSelect(){
+ const sel=document.getElementById("viewCurSel");
+ if(!sel)return;
+ const b=baseCode(),v=S.settings.viewCur||"";
+ const list=[...new Set([...(S.settings.favCur||[]),...POPULAR])].filter(c=>c!==b);
+ if(v&&!list.includes(v))list.push(v);
+ sel.innerHTML=`<option value="">${CUR_SYM[b]||""} ${b}</option>`+list.map(c=>`<option value="${c}">≈ ${CUR_SYM[c]||""} ${c}</option>`).join("");
+ sel.value=v;
+}
+function setViewCur(v){
+ S.settings.viewCur=v;
+ persist();
+ if(v)ensureRates();
+ refresh();
+}
+function updateViewBanner(){
+ const b=document.getElementById("viewBanner");
+ if(!b)return;
+ const v=S.settings.viewCur,base=baseCode();
+ if(!v||v===base){b.style.display="none";return;}
+ b.style.display="block";
+ if(viewActive()){
+  const d=RATES.provDate?(RATES.source==="nbu"?RATES.provDate:new Date(RATES.provDate).toLocaleDateString("uk-UA")):"—";
+  b.innerHTML=`💱 Суми показано у <b>${v}</b> за поточним курсом (${RATES.source==="nbu"?"НБУ":"світовий"}, ${d}) — орієнтовно. Вносяться та зберігаються суми в ${base}. <button class="btn smallBtn" style="margin-left:6px" onclick="setViewCur('')">Показати в ${base}</button>`;
+ }else{
+  b.innerHTML=`💱 Очікую курси для ${v}… Якщо немає інтернету й немає збережених курсів, суми показуються в ${base}. <button class="btn smallBtn" style="margin-left:6px" onclick="setViewCur('')">Показати в ${base}</button>`;
+ }
+}
+
+/* =========================================================
    ПЕРЕКАЗИ МІЖ РАХУНКАМИ
 ========================================================= */
 function transferModal(){
@@ -2925,6 +2988,7 @@ async function refreshRates(manual){
   try{localStorage.setItem(RATES_KEY,JSON.stringify(r));}catch(e){}
   convFilled=false;
   renderConverter();
+  if(S.settings.viewCur)refresh();
  }catch(e){
   if(st)st.textContent="Не вдалося отримати курси. Перевірте інтернет і спробуйте ще раз."+(RATES?" Показано останні збережені.":"");
  }
@@ -3095,6 +3159,7 @@ function calPick(ds){calSel=calSel===ds?"":ds;renderCalendar();}
 function calShort(v,mode){
  if(S.settings.hideAmounts)return "•••";
  if(!v)return "";
+ v=v*viewFactor();
  const a=Math.abs(v);
  const txt=a>=10000?Math.round(a/1000)+"k":a>=1000?(a/1000).toFixed(1).replace(".0","")+"k":String(Math.round(a));
  return mode==="net"?(v>0?"+":"−")+txt:txt;
@@ -3552,6 +3617,8 @@ function refresh(syncForm){
  updateBudget();
  updateCharts();
  updateCompare();
+ fillViewSelect();
+ updateViewBanner();
  loadExtraSettings();
  if(syncForm)loadSettingsToForm();
 }
@@ -3566,6 +3633,7 @@ window.addEventListener("DOMContentLoaded",()=>{
  initCalendarSwipe();
  scheduleUpdateChecks();
  loadRatesCache();
+ if(S.settings.viewCur)ensureRates();
  const e=document.getElementById("expenseDate"),i=document.getElementById("incomeDate");
  if(e&&!e.value)e.value=today();
  if(i&&!i.value)i.value=today();
