@@ -1,6 +1,7 @@
 /* Financial Strategy 2026 PRO — service worker
-   Змінюйте VERSION при кожному оновленні index.html, щоб користувачі отримали нову версію. */
-const VERSION="fin26-v2";
+   index.html завантажується з мережі першим (без застарілого кешу), тому для оновлення програми
+   достатньо замінити index.html. Цей файл змінювати не потрібно. */
+const VERSION="fin26-v3";
 const CORE=["./","./index.html","./manifest.json","./icon-192.png","./icon-512.png","./icon-maskable-512.png","./apple-touch-icon.png"];
 const CDN=["https://cdn.jsdelivr.net/npm/chart.js"];
 const RUNTIME_HOSTS=["cdn.jsdelivr.net","cdnjs.cloudflare.com","tessdata.projectnaptha.com","unpkg.com"];
@@ -29,11 +30,12 @@ self.addEventListener("fetch",e=>{
  const req=e.request;
  if(req.method!=="GET")return;
  const url=new URL(req.url);
+ if(url.searchParams.has("chk"))return; // перевірка оновлення — напряму в мережу
 
  // Сторінка: спершу мережа (щоб отримувати оновлення), без мережі — з кешу
  if(req.mode==="navigate"){
   e.respondWith(
-   fetch(req).then(r=>{
+   fetch(req.url,{cache:"no-cache"}).then(r=>{
     const cp=r.clone();
     caches.open(VERSION).then(c=>c.put("./index.html",cp));
     return r;

@@ -376,6 +376,12 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
     <span class="instrTag">Календар</span>
    </div></div>
 
+   <div class="instrStep"><div class="instrNum">22</div><div class="instrBody">
+    <div class="instrTitle"><span class="instrIcon">🔄</span> Оновлення програми</div>
+    <div class="instrText">Програма сама перевіряє наявність нової версії під час запуску та коли ви повертаєтесь до неї. Якщо оновлення є, внизу з'явиться повідомлення з кнопкою «Оновити». Перевірити вручну можна в «Налаштування → 🔄 Оновлення програми». Дані при оновленні не втрачаються. Незбережені дані у відкритих формах перед оновленням краще зберегти. Для публікації нової версії достатньо замінити на GitHub один файл index.html.</div>
+    <span class="instrTag">Налаштування</span>
+   </div></div>
+
    <div class="instrStep"><div class="instrNum">20</div><div class="instrBody">
     <div class="instrTitle"><span class="instrIcon">📲</span> Встановлення як застосунок і робота офлайн</div>
     <div class="instrText">Якщо програма розміщена за https-адресою, у «Налаштування → 📲 Застосунок та офлайн-режим» натисніть «Встановити застосунок» (на iPhone: Safari → «Поділитись» → «На початковий екран»). Після першого відкриття з інтернетом програма працює й без нього: усі операції, цілі й фото зберігаються на пристрої. Без інтернету не працюють лише хмарна синхронізація JSONBin та перше розпізнавання чека (мовний модуль потрібно один раз завантажити онлайн). Нові версії програма пропонує встановити сама.</div>
@@ -858,6 +864,14 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
    <div id="catManager"></div>
   </div>
   <div class="card" style="margin-top:14px">
+   <h2>🔄 Оновлення програми</h2>
+   <div class="statLine"><span>Поточна версія</span><b id="updVer"></b></div>
+   <div class="row" style="margin-top:10px">
+    <button class="btn cyan" onclick="checkUpdate(true)">🔄 Перевірити оновлення</button>
+   </div>
+   <div id="updStatus" class="small muted" style="margin-top:10px"></div>
+  </div>
+  <div class="card" style="margin-top:14px">
    <h2>💾 Резервна копія</h2>
    <div class="row">
     <button class="btn green" onclick="exportBackup(false)">⬇️ Експорт JSON</button>
@@ -882,6 +896,16 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
 <div id="offlineBar" style="display:none;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:4000;padding:10px 14px;border-radius:12px;background:#2b2411;border:1px solid rgba(255,209,102,.5);color:#ffd166;font-size:12px;text-align:center">📴 Немає інтернету — програма працює офлайн. Усі дані зберігаються на пристрої; хмарна синхронізація та перше розпізнавання чеків недоступні.</div>
 <div id="updateBar" style="display:none;position:fixed;left:10px;right:10px;bottom:calc(60px + env(safe-area-inset-bottom,0px));z-index:4001;padding:10px 14px;border-radius:12px;background:#0d2a3a;border:1px solid rgba(70,224,255,.5);color:#46e0ff;font-size:13px;text-align:center">🔄 Доступна нова версія програми. <button class="btn cyan smallBtn" onclick="applyUpdate()">Оновити</button></div>
 
+<div id="updBanner" class="card" style="display:none;position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:6500;max-width:520px;margin:auto;">
+ <div class="row" style="justify-content:space-between;flex-wrap:nowrap">
+  <div><b>🆕 Доступна нова версія</b><div class="small muted" id="updBannerText"></div></div>
+  <div class="row" style="flex-wrap:nowrap">
+   <button class="btn green smallBtn" onclick="applyUpdate()">Оновити</button>
+   <button class="btn smallBtn" onclick="document.getElementById('updBanner').style.display='none'">✕</button>
+  </div>
+ </div>
+</div>
+
 <div id="photoViewer" class="modal" onclick="closePhoto()"><img id="photoViewerImg" alt=""></div>
 
 <div id="modal" class="modal" onclick="if(event.target===this)closeModal()">
@@ -892,6 +916,7 @@ body{padding-bottom:env(safe-area-inset-bottom,0px);}
 /* =========================================================
    STATE
 ========================================================= */
+const APP_VERSION="2026.10.02-1";
 const KEY="fin26_state_v13";
 const KEY_PERIOD="fin26_period_v1";      // окрема резервна копія періоду
 const KEY_MIG="fin26_migrated_v1";       // прапорець: старі ключі вже перенесені
@@ -2761,6 +2786,54 @@ function renderPlans(){
 }
 
 /* =========================================================
+   ОНОВЛЕННЯ ПРОГРАМИ
+========================================================= */
+let lastUpdCheck=0,foundVersion="";
+function setUpdStatus(t){const e=document.getElementById("updStatus");if(e)e.textContent=t;}
+
+async function checkUpdate(manual){
+ const ver=document.getElementById("updVer");
+ if(ver)ver.textContent=APP_VERSION;
+ if(!navigator.onLine){if(manual)setUpdStatus("Немає інтернету. Спробуйте, коли з'явиться мережа.");return;}
+ if(manual)setUpdStatus("⏳ Перевірка…");
+ try{
+  const r=await fetch("index.html?chk="+Date.now(),{cache:"no-store"});
+  if(!r.ok)throw new Error("http");
+  const m=(await r.text()).match(/const APP_VERSION="([^"]+)"/);
+  lastUpdCheck=Date.now();
+  if(m&&m[1]!==APP_VERSION){
+   foundVersion=m[1];
+   setUpdStatus(`🆕 Доступна версія ${m[1]} (у вас ${APP_VERSION}).`);
+   document.getElementById("updBannerText").textContent=`Версія ${m[1]}. Натисніть «Оновити».`;
+   document.getElementById("updBanner").style.display="block";
+  }else if(manual){
+   setUpdStatus(`✅ У вас остання версія (${APP_VERSION}). Якщо ви щойно завантажили нову на GitHub, зачекайте 1–2 хвилини й перевірте ще раз.`);
+  }
+ }catch(e){
+  if(manual)setUpdStatus("Не вдалося перевірити оновлення. Перевірте інтернет і спробуйте ще раз.");
+ }
+}
+
+async function applyUpdate(){
+ try{
+  if("serviceWorker" in navigator){
+   const reg=await navigator.serviceWorker.getRegistration();
+   if(reg)await reg.update();
+  }
+ }catch(e){}
+ location.reload();
+}
+
+function scheduleUpdateChecks(){
+ const ver=document.getElementById("updVer");
+ if(ver)ver.textContent=APP_VERSION;
+ setTimeout(()=>checkUpdate(false),4000);
+ document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden&&Date.now()-lastUpdCheck>10*60000)checkUpdate(false);
+ });
+}
+
+/* =========================================================
    КАЛЕНДАР ВИТРАТ
 ========================================================= */
 let calY=new Date().getFullYear(),calM=new Date().getMonth(),calSel="",calMode="expense";
@@ -3252,6 +3325,7 @@ window.addEventListener("DOMContentLoaded",()=>{
  applyTheme();
  setupPWA();
  initCalendarSwipe();
+ scheduleUpdateChecks();
  const e=document.getElementById("expenseDate"),i=document.getElementById("incomeDate");
  if(e&&!e.value)e.value=today();
  if(i&&!i.value)i.value=today();
